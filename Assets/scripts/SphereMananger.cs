@@ -10,7 +10,6 @@ public class SphereManager : MonoBehaviour
     void Update()
     {
         bothTriggered = sphere1.isTriggered && sphere2.isTriggered;
-
         Debug.Log("둘 다 트리거 상태: " + bothTriggered);
     }
 }

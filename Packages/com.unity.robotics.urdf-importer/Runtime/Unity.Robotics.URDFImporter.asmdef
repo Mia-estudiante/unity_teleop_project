@@ -1,0 +1,35 @@
+{
+    "name": "Unity.Robotics.UrdfImporter",
+    "rootNamespace": "Unity.Robotics.UrdfImporter.Urdf",
+    "references": [
+        "GUID:6a697808d7c80a549b57420070d6c4f3"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [
+        "Android",
+        "EmbeddedLinux",
+        "iOS",
+        "Kepler",
+        "CloudRendering",
+        "macOSStandaloneServer",
+        "Switch2",
+        "Switch",
+        "PS4",
+        "PS5",
+        "QNX",
+        "tvOS",
+        "WSA",
+        "WebGL",
+        "WindowsStandalone32",
+        "GameCoreXboxOne",
+        "XboxOne",
+        "GameCoreScarlett"
+    ],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

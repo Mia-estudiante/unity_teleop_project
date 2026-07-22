@@ -1,92 +1,90 @@
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
-using SensorUnity = RosMessageTypes.Sensor.JointStateMsg;
-using RosMessageTypes.Sensor;
-using UnityEngine.InputSystem;
-using RosMessageTypes.Std;
+using RosMessageTypes.Std; // Float64MultiArrayMsg를 사용하기 위해 추가
 using System;
-using System.Linq;
 using System.Collections.Generic;
-using Unity.Robotics.ROSTCPConnector.MessageGeneration;
+
 public class IgrisCHandController2 : MonoBehaviour
 {
     ROSConnection ros;
-    // private string ctlTopicName = "/mujoco/controller";
-    private string handJointTopicName = "/unity/hand_joint_states";
-
-    // 업데이트 간격 제한
-    // private float updateInterval = 0.05f; // 50ms
-    // private float lastUpdateTime = 0f;
-
-
-    // ROS PUBLISHER
-    // public string JointStateTopicName = "/mujoco/hand_joint_states";
-    // float timeElapsed;
-    // public float publishRateHz = 20f;
-    // public ArticulationBody[] jointArticulations;
+    private string handJointTopicName = "/mujoco/hand_controller";
+    private float updateInterval = 0.01f;
+    private float lastUpdateTime = 0f;
 
     public ArticulationBody[] leftHandJoints;
     public ArticulationBody[] rightHandJoints;
     public SphereManager manager;
 
-    // private int[] leftTargetIndex = new int[] {0,2,4,6,9,8};
-    // private int[] rightTargetIndex = new int[] {0,2,4,6,9,8};
-
-    private SensorUnity latestMsg;
-    private double[] lfingers_qpos = new double[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    private double[] rfingers_qpos = new double[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    private string[] lfingers_names = new string[11];
-    private string[] rfingers_names = new string[11];
-    private string[] hand_joint_names = new string[22];
+    // ★ 중요: 기존 JointStateMsg 대신 Float64MultiArrayMsg로 변경
+    private Float64MultiArrayMsg latestMsg;
 
     Dictionary<string, ArticulationBody> leftMap = new Dictionary<string, ArticulationBody>();
     Dictionary<string, ArticulationBody> rightMap = new Dictionary<string, ArticulationBody>();
 
+    // 파이썬 DexRetargeting에서 들어오는 6개 데이터의 관절 매핑 순서 정의
+    // ※ 만약 실행했을 때 손가락이 다르게 움직인다면, 이 배열의 순서를 파이썬 target_joint_names 순서와 일치하도록 변경하세요.
+    private string[] jointOrder = new string[]
+    {
+        "Little_Middle",
+        "Ring_Middle",
+        "Middle_Middle",
+        "Index_Middle",
+        "Thumb_Middle",
+        "Thumb_Proximal"
+    };
+
     string ExtractKey(string name)
     {
-        // 예: Left_Link_Thumb_Proximal
         var parts = name.Split('_');
-
-        // 뒤 2개 붙이기
         return parts[parts.Length - 2] + "_" + parts[parts.Length - 1];
     }
 
-    // articulate joint name
     void BuildJointMap()
     {
         foreach (var joint in leftHandJoints)
         {
-            string key = ExtractKey(joint.name); // Thumb_Proximal 같은 것
+            string key = ExtractKey(joint.name); 
             leftMap[key] = joint;
-            // Debug.Log($"Left map: {key} -> {joint.name}");
         }
 
         foreach (var joint in rightHandJoints)
         {
             string key = ExtractKey(joint.name);
             rightMap[key] = joint;
-            // Debug.Log($"Right map: {key} -> {joint.name}");
         }
     }
 
-    string ExtractKeyFromROS(string name)
+    void InitializeJointDrives(ArticulationBody[] joints)
     {
-        // 예: Left_1_Joint_Thumb_Proximal
-        var parts = name.Split('_');
+        if (joints == null) return;
 
-        return parts[parts.Length - 2] + "_" + parts[parts.Length - 1];
+        foreach (var joint in joints)
+        {
+            if (joint == null) continue;
+
+            var drive = joint.xDrive;
+
+            drive.target =
+                joint.jointPosition[0] * Mathf.Rad2Deg;
+
+            drive.stiffness = 200f;
+            drive.damping = 250f;
+            drive.forceLimit = 80f;
+
+            joint.xDrive = drive;
+        }
     }
 
     void Start()
     {
         ros = ROSConnection.GetOrCreateInstance();
-        // if (jointArticulations == null || jointArticulations.Length == 0)
-        // {
-        //     jointArticulations = GetComponentsInChildren<ArticulationBody>();
-        // }
-        ros.Subscribe<SensorUnity>(handJointTopicName, JointStateCallback);
-        // ros.RegisterPublisher<Float64MultiArrayMsg>(handJointTopicName);
+        
+        // ★ 구독(Subscribe)하는 메시지 타입을 Float64MultiArrayMsg로 변경
+        ros.Subscribe<Float64MultiArrayMsg>(handJointTopicName, JointStateCallback);
+        
         BuildJointMap();
+        InitializeJointDrives(leftHandJoints);
+        InitializeJointDrives(rightHandJoints);
     }
 
     void FixedUpdate()
@@ -96,69 +94,87 @@ public class IgrisCHandController2 : MonoBehaviour
         ApplyHand(latestMsg);
     }
 
-    // little_middle, ring_middle, middle_middle, index_middle, thumb_middle, thumb_proximal
-    void JointStateCallback(SensorUnity msg)
+    // ★ 콜백 함수 매개변수 타입을 Float64MultiArrayMsg로 변경
+    void JointStateCallback(Float64MultiArrayMsg msg)
     {
-        // 🔥 trigger 안되면 로봇 멈춤
         if (manager == null || !manager.bothTriggered)
             return;
 
+        if (Time.time - lastUpdateTime < updateInterval)
+            return;
+
+        lastUpdateTime = Time.time;
+
         latestMsg = msg;
-    
-        // for (int i = 0; i < msg.name.Length; i++)
-        // {
-        //     string rosName = msg.name[i];
-        //     double pos = msg.position[i];
-
-        //     string key = ExtractKeyFromROS(rosName);
-
-        //     if (rosName.StartsWith("Left_"))
-        //     {
-        //         if (leftMap.ContainsKey(key))
-        //         {
-        //             ApplyJoint(leftMap[key], pos, rosName);
-        //         }
-        //     }
-        //     else if (rosName.StartsWith("Right_"))
-        //     {
-        //         if (rightMap.ContainsKey(key))
-        //         {
-        //             ApplyJoint(rightMap[key], pos, rosName);
-        //         }
-        //     }
-        // }
     }
 
-    void ApplyHand(SensorUnity msg)
+    // ★ 인덱스 기반으로 데이터를 해석하여 손가락에 적용하는 함수
+    void ApplyHand(Float64MultiArrayMsg msg)
     {
-        for (int i = 0; i < msg.name.Length; i++)
+        // 데이터가 총 12개(왼손 6개 + 오른손 6개) 이상 들어왔는지 검증
+        if (msg.data.Length < 12) return;
+
+        // 1. 왼손 제어 (msg.data[0] ~ msg.data[5])
+        for (int i = 0; i < 6; i++)
         {
-            string rosName = msg.name[i];
-            double pos = msg.position[i];
+            string key = jointOrder[i];
+            double rad = msg.data[i];
 
-            string key = ExtractKeyFromROS(rosName);
-
-            if (rosName.StartsWith("Left_"))
+            if (leftMap.ContainsKey(key))
             {
-                if (leftMap.ContainsKey(key))
-                    ApplyJoint(leftMap[key], pos, rosName);
+                ApplyJoint(leftMap[key], rad);
             }
-            else if (rosName.StartsWith("Right_"))
+        }
+
+        // 2. 오른손 제어 (msg.data[6] ~ msg.data[11])
+        for (int i = 0; i < 6; i++)
+        {
+            string key = jointOrder[i];
+            double rad = msg.data[i + 6]; // 오른손 데이터는 인덱스 6번부터 시작
+
+            if (rightMap.ContainsKey(key))
             {
-                if (rightMap.ContainsKey(key))
-                    ApplyJoint(rightMap[key], pos, rosName);
+                ApplyJoint(rightMap[key], rad);
             }
         }
     }
 
-    void ApplyJoint(ArticulationBody joint, double rad, string rosName)
+    void ApplyJoint(ArticulationBody joint, double rad)
     {
         var drive = joint.xDrive;
-        drive.target = (float)(Mathf.Rad2Deg * rad);
-        drive.stiffness = 3000f;
-        drive.damping = 200f;
-        drive.forceLimit = float.MaxValue;
+
+        // 현재 target
+        float current = drive.target;
+
+        float target = (float)(Mathf.Rad2Deg * rad);
+
+        // limit clamp
+        // target = Mathf.Clamp(target, 0f, 70f);
+        drive.target = Mathf.MoveTowards(
+            current,
+            target,
+            800f * Time.fixedDeltaTime
+        );
+        // drive.target =
+        //     Mathf.Lerp(current, target, 0.08f);
+
+        drive.stiffness = 200f;
+        drive.damping = 250f;
+        drive.forceLimit = 150;
         joint.xDrive = drive;
-        Debug.Log($"joint name: {joint.name} -> {rosName}");
     }
+
+    // void ApplyJoint(ArticulationBody joint, double rad)
+    // {
+    //     var drive = joint.xDrive;
+    //     drive.target = (float)(Mathf.Rad2Deg * rad);
+        
+    //     // drive.stiffness = 500f;
+    //     drive.stiffness = 1000f;
+    //     drive.damping = 400f;
+    //     drive.forceLimit = 150f;
+    //     // drive.damping = 200f;
+    //     // drive.forceLimit = float.MaxValue;
+    //     joint.xDrive = drive;
+    // }
 }

@@ -147,10 +147,6 @@ PlayerSettings:
   bundleVersion: 0.1.0
   preloadedAssets:
   - {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  - {fileID: 3922115497710373668, guid: fc916020edaa44396a674a630c8b1bae, type: 2}
-  - {fileID: -3069566775849875219, guid: 73fef4935258f45e3a0d4c9010633870, type: 2}
-  - {fileID: 11400000, guid: b7928d782cc10481f90f9b6fe5747a64, type: 2}
-  - {fileID: 11400000, guid: 26c26194532844d24af542a59648c606, type: 2}
   metroInputSource: 0
   wsaTransparentSwapchain: 0
   m_HolographicPauseOnTrackingLoss: 1
@@ -586,7 +582,7 @@ PlayerSettings:
   enableCrashReportAPI: 0
   cameraUsageDescription: 
   locationUsageDescription: 
-  microphoneUsageDescription: 
+  microphoneUsageDescription: STT
   bluetoothUsageDescription: 
   macOSTargetOSVersion: 12.0
   switchNMETAOverride: 
@@ -953,9 +949,9 @@ PlayerSettings:
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
-  platformRequiresReadableAssets: 1
+  platformRequiresReadableAssets: 0
   virtualTexturingSupportEnabled: 0
-  insecureHttpOption: 0
+  insecureHttpOption: 2
   androidVulkanDenyFilterList: []
   androidVulkanAllowFilterList: []
   androidVulkanDeviceFilterListAsset: {fileID: 0}

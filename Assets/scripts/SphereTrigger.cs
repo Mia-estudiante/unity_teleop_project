@@ -24,18 +24,42 @@ public class SphereTrigger : MonoBehaviour
 
     public float palmUpThreshold = 0.8f;
     public float palmUpHoldTime = 3.0f;
+    private bool _initialized = false;
 
-    void Start()
+    // 기존 Start 대신 Awake로 변경!
+    void Awake()
     {
         rend = GetComponent<Renderer>();
-        defaultColor = rend.material.color;
-        initialPosition = transform.position;
+        if (rend != null)
+        {
+            defaultColor = rend.material.color;
+        }
+        
+        // 씬이 켜지자마자 부모가 꺼지기 전에 '진짜 월드 좌표'를 먼저 기억합니다.
+        initialPosition = transform.position;   
+        Debug.Log($"[SphereTrigger Awake] {gameObject.name} initialPosition: {initialPosition}");
+        _initialized = true;
+    }
+
+    void OnEnable()
+    {
+        // Start 이후 재활성화(re-press Start) 시에만 scene 위치로 복귀
+        if (!_initialized) return;
+        transform.position = initialPosition;
+        isTriggered = false;
+        isInside    = false;
+        isPalmUp    = false;
+        palmUpStartTime = 0f;
+        enterTime   = 0f;
+        exitTime    = 0f;
+        if (rend != null) rend.material.color = defaultColor;
     }
 
     void Update()
     {
         // 🔥 palm 방향 체크
-        if (handTarget != null)
+        if (handTarget == null) return;
+        else
         {
             float dot = Vector3.Dot(handTarget.up, Vector3.down);
 
@@ -87,15 +111,26 @@ public class SphereTrigger : MonoBehaviour
         }
     }
 
+    // 외부에서 초기 위치를 설정할 때 호출
+    public void SetHomePosition(Vector3 worldPos)
+    {
+        transform.position = worldPos;
+        initialPosition    = worldPos;
+        isTriggered = false;
+        isInside    = false;
+        isPalmUp    = false;
+        enterTime   = 0f;
+        exitTime    = 0f;
+        if (rend != null) rend.material.color = defaultColor;
+    }
+
     void ResetSphere()
     {
         isTriggered = false;
         isInside = false;
         isPalmUp = false;
-
-        // transform.position = initialPosition;
+        // transform.position = initialPosition;   // ← 주석 풀기 (선택)
         rend.material.color = defaultColor;
-
         Debug.Log("Reset by Palm Up Hold");
     }
 
@@ -117,5 +152,18 @@ public class SphereTrigger : MonoBehaviour
             exitTime = Time.time;
             Debug.Log($"Exit {other.tag}");
         }
+    }
+
+    // SphereTrigger.cs 안에 추가
+    public void ResetTrigger()
+    {
+        isTriggered = false;
+        isInside = false;
+        isPalmUp = false;
+        palmUpStartTime = 0f;
+        enterTime = 0f;
+        exitTime = 0f;
+        transform.position = initialPosition;   // ← 동일
+        if (rend != null) rend.material.color = defaultColor;
     }
 }
